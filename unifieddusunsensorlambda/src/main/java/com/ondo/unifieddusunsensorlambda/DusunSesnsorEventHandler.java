@@ -63,6 +63,9 @@ public class DusunSesnsorEventHandler
 			}
 		}
 		logger.log("TOTALconnectable RECORD=" + filteredDataList.size());
+		for (Map<String, Object> map : filteredDataList) {
+			logger.log("DATA ::" + map);
+		}
 		logger.log("Lambda END @ " + new Date());
 		return null;
 	}
