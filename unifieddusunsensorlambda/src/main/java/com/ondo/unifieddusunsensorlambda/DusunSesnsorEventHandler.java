@@ -5,8 +5,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
@@ -48,7 +50,7 @@ public class DusunSesnsorEventHandler
 			}
 		}
 		logger.log("TOTAL EVENT MSG=" + input.getRecords().size() + " Parsed Record=" + dataList.size());
-		List<Map<String, Object>> filteredDataList = new ArrayList<>();
+		Set<String> filteredDataList = new HashSet<>();
 		for (Map<String, Object> map : dataList) {
 			Map<String, Object> data = (Map<String, Object>) map.get("data");
 			Map<String, Object> data_value = (Map<String, Object>) data.get("value");
@@ -56,18 +58,26 @@ public class DusunSesnsorEventHandler
 			List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
 			for (Map<String, Object> map2 : device_list) {
 				if (map2.get("connectable") != null) {
-					if ("1".equalsIgnoreCase(map2.get("connectable").toString())==false) {
-						filteredDataList.add(map2);
+					if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false) {
+						filteredDataList.add(map2.get("data").toString());
 					}
 				}
 			}
 		}
-		logger.log("TOTALconnectable RECORD=" + filteredDataList.size());
-		for (Map<String, Object> map : filteredDataList) {
+		System.out.println("TOTALconnectable RECORD=" + filteredDataList.size());
+		for (String map : filteredDataList) {
 			logger.log("DATA ::" + map);
 		}
+
+		for (String rawDataString : filteredDataList) {
+
+			BandEvent bandEvent = LambdaUtil.parseRawDataString(rawDataString);
+			logger.log(bandEvent.toString());
+		}
+
 		logger.log("Lambda END @ " + new Date());
-		return null;
+
+		return response;
 	}
 
 }
