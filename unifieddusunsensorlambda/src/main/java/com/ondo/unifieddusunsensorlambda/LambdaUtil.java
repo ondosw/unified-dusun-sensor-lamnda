@@ -33,31 +33,22 @@ public class LambdaUtil {
 		BandEvent bandEvent = new BandEvent();
 		bandEvent.setRawData(rawDataString);
 
-		String[] fields = rawDataString.split(",");
+		bandEvent.setFwVersion(Integer.parseInt(rawDataString.substring(8, 10), 16));
+		// bandEvent.setRssi(Integer.parseInt((fields[3])));
+		// bandEvent.setGatewayBLEMacId(fields[2]);
 
-		bandEvent.setFwVersion(Integer.parseInt(fields[4].substring(8, 10), 16));
-		bandEvent.setRssi(Integer.parseInt((fields[3])));
-		bandEvent.setGatewayBLEMacId(fields[2]);
+		bandEvent.setBandId(convertBandId(rawDataString.substring(10, 18)));
+		bandEvent.setCurTemp(convertSkinTemp(rawDataString.substring(18, 21)));
+		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
+		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
 
-		bandEvent.setBandId(convertBandId(fields[4].substring(10, 18)));
-		bandEvent.setCurTemp(convertSkinTemp(fields[4].substring(18, 21)));
-		bandEvent.setAmbTemp(convertAmbientTemp(fields[4].substring(21, 24)));
-		bandEvent.setBattery(convertBatteryVal(fields[4].substring(24, 25)));
-		 
-
-		bandEvent.setAccValue(Integer.parseInt(fields[4].substring(25, 28), 16));
+		bandEvent.setAccValue(Integer.parseInt(rawDataString.substring(25, 28), 16));
 
 		BridgeEvent bridgeEvent = new BridgeEvent();
 
-		bridgeEvent.setMacId(fields[2]);
-		if (fields.length > 5) {
-			String timePlusSth = fields[5].toString();
-			String timeBridge = timePlusSth.substring(0, timePlusSth.length() - 4);
-			Long bridgeTime = Long.parseLong(timeBridge);
-			bridgeEvent.setHeartBeatTime(bridgeTime);
-		} else {
-			bridgeEvent.setHeartBeatTime(new Date().getTime());
-		}
+		// bridgeEvent.setMacId(fields[2]);
+
+		bridgeEvent.setHeartBeatTime(new Date().getTime());
 
 		bandEvent.setBridgeEvent(bridgeEvent);
 
