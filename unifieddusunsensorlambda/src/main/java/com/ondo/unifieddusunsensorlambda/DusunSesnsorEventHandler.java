@@ -56,7 +56,7 @@ public class DusunSesnsorEventHandler
 			List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
 			for (Map<String, Object> map2 : device_list) {
 				if (map2.get("connectable") != null) {
-					if ("1".equalsIgnoreCase(map2.get("connectable").toString())) {
+					if ("1".equalsIgnoreCase(map2.get("connectable").toString())==false) {
 						filteredDataList.add(map2);
 					}
 				}
