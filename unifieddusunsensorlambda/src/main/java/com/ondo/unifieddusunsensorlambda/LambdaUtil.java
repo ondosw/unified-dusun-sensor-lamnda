@@ -26,15 +26,15 @@ public class LambdaUtil {
 	}
 
 	static String convertBandId(String batteryVal) {
-		return String.valueOf(Integer.parseInt(batteryVal, 16));
+		return String.valueOf(Long.valueOf(batteryVal, 16));
 	}
 
 	static BandEvent parseRawDataString(final String rawDataString) {
 		BandEvent bandEvent = new BandEvent();
 		bandEvent.setRawData(rawDataString);
 
-		bandEvent.setFwVersion(Integer.parseInt(rawDataString.substring(8, 10), 16));
-		// bandEvent.setRssi(Integer.parseInt((fields[3])));
+		bandEvent.setFwVersion(Integer.valueOf(rawDataString.substring(8, 10), 16));
+		// bandEvent.setRssi(Long.valueOf((fields[3])));
 		// bandEvent.setGatewayBLEMacId(fields[2]);
 
 		bandEvent.setBandId(convertBandId(rawDataString.substring(10, 18)));
@@ -42,7 +42,7 @@ public class LambdaUtil {
 		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
 		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
 
-		bandEvent.setAccValue(Integer.parseInt(rawDataString.substring(25, 28), 16));
+		bandEvent.setAccValue(Integer.valueOf(rawDataString.substring(25, 28), 16));
 
 		BridgeEvent bridgeEvent = new BridgeEvent();
 
@@ -56,17 +56,17 @@ public class LambdaUtil {
 	}
 
 	static Float convertBatteryVal(String batteryVal) {
-		int num = Integer.parseInt(batteryVal, 16);
+		int num = Integer.valueOf(batteryVal, 16);
 		return (3 - (float) num / 10);
 	}
 
 	static Float convertAmbientTemp(String ambTemp) {
-		return Float.valueOf(Integer.parseInt(ambTemp.substring(0, 2), 16))
+		return Float.valueOf(Long.valueOf(ambTemp.substring(0, 2), 16))
 				+ (Float.valueOf(ambTemp.substring(2, 3)) / 10);
 	}
 
 	static Float convertSkinTemp(String skinTemp) {
-		return Float.valueOf(Integer.parseInt(skinTemp.substring(0, 2), 16))
+		return Float.valueOf(Long.valueOf(skinTemp.substring(0, 2), 16))
 				+ (Float.valueOf(skinTemp.substring(2, 3)) / 10);
 	}
 
