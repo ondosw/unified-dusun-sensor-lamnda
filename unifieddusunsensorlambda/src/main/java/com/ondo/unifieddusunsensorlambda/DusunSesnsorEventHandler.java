@@ -19,6 +19,8 @@ import com.amazonaws.services.lambda.runtime.events.KinesisFirehoseEvent;
 import com.amazonaws.services.lambda.runtime.events.KinesisFirehoseEvent.Record;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import redis.clients.jedis.Jedis;
+
 public class DusunSesnsorEventHandler
 		implements RequestHandler<KinesisFirehoseEvent, KinesisAnalyticsInputPreprocessingResponse> {
 	private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -28,9 +30,28 @@ public class DusunSesnsorEventHandler
 	public KinesisAnalyticsInputPreprocessingResponse handleRequest(KinesisFirehoseEvent input, Context context) {
 		LambdaLogger logger = context.getLogger();
 		KinesisAnalyticsInputPreprocessingResponse response = new KinesisAnalyticsInputPreprocessingResponse();
+		if (System.getenv("jedis_url") == null) {
+			logger.log("jedis_url Configuration Is Required ");
+			return response;
+		}
+		if (System.getenv("bandRangeEnd") == null) {
+			logger.log("bandRangeEnd Configuration Is Required ");
+			return response;
+		}
+		if (System.getenv("bandRangeStart") == null) {
+			logger.log("bandRangeStart Configuration Is Required ");
+		}
+
+		Integer bandRangeEnd = Integer.valueOf(System.getenv("bandRangeEnd"));
+
+		Integer bandRangeStart = Integer.valueOf(System.getenv("bandRangeStart"));
+
+		Jedis jedisObj = new Jedis(System.getenv("jedis_url"));
+
 		logger.log("Lambda START @ " + new Date());
 		if (input.getRecords() == null || input.getRecords().isEmpty()) {
 			logger.log("Its Empty List - No records found! Lambda Ends here! @ " + new Date());
+			jedisObj.close();
 			return response;
 		}
 		List<Map<String, Object>> dataList = new ArrayList<>();
@@ -68,15 +89,24 @@ public class DusunSesnsorEventHandler
 		for (String map : filteredDataList) {
 			logger.log("DATA ::" + map);
 		}
-
+		List<BandEvent> allBandEvents = new ArrayList<>();
 		for (String rawDataString : filteredDataList) {
 
 			BandEvent bandEvent = LambdaUtil.parseRawDataString(rawDataString);
+			if (Long.valueOf(bandEvent.getBandId()) >= bandRangeStart
+					&& Long.valueOf(bandEvent.getBandId()) <= bandRangeEnd) {
+				allBandEvents.add(bandEvent);
+			} else {
+				logger.log(bandEvent.getBandId() + " Is In Invalid Range =(" + bandRangeStart + " - " + bandRangeEnd
+						+ ")");
+			}
+
+		}
+		for (BandEvent bandEvent : allBandEvents) {
 			logger.log(bandEvent.toString());
 		}
-
 		logger.log("Lambda END @ " + new Date());
-
+		jedisObj.close();
 		return response;
 	}
 

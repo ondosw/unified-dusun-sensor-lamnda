@@ -34,10 +34,9 @@ public class LambdaUtil {
 		bandEvent.setRawData(rawDataString);
 
 		bandEvent.setFwVersion(Integer.valueOf(rawDataString.substring(8, 10), 16));
-		// bandEvent.setRssi(Long.valueOf((fields[3])));
-		// bandEvent.setGatewayBLEMacId(fields[2]);
+		Long bandid = Long.valueOf(convertBandId(rawDataString.substring(10, 18)));
 
-		bandEvent.setBandId(convertBandId(rawDataString.substring(10, 18)));
+		bandEvent.setBandId(bandid.toString());
 		bandEvent.setCurTemp(convertSkinTemp(rawDataString.substring(18, 21)));
 		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
 		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
@@ -61,8 +60,7 @@ public class LambdaUtil {
 	}
 
 	static Float convertAmbientTemp(String ambTemp) {
-		return Float.valueOf(Long.valueOf(ambTemp.substring(0, 2), 16))
-				+ (Float.valueOf(ambTemp.substring(2, 3)) / 10);
+		return Float.valueOf(Long.valueOf(ambTemp.substring(0, 2), 16)) + (Float.valueOf(ambTemp.substring(2, 3)) / 10);
 	}
 
 	static Float convertSkinTemp(String skinTemp) {
