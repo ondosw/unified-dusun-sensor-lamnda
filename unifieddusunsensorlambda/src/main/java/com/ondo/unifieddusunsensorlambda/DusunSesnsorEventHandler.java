@@ -29,6 +29,8 @@ public class DusunSesnsorEventHandler
 	@Override
 	public KinesisAnalyticsInputPreprocessingResponse handleRequest(KinesisFirehoseEvent input, Context context) {
 		LambdaLogger logger = context.getLogger();
+		logger.log("Lambda START @ " + new Date());
+	
 		KinesisAnalyticsInputPreprocessingResponse response = new KinesisAnalyticsInputPreprocessingResponse();
 		if (System.getenv("jedis_url") == null) {
 			logger.log("jedis_url Configuration Is Required ");
@@ -40,6 +42,7 @@ public class DusunSesnsorEventHandler
 		}
 		if (System.getenv("bandRangeStart") == null) {
 			logger.log("bandRangeStart Configuration Is Required ");
+			return response;
 		}
 
 		Integer bandRangeEnd = Integer.valueOf(System.getenv("bandRangeEnd"));
@@ -48,7 +51,7 @@ public class DusunSesnsorEventHandler
 
 		Jedis jedisObj = new Jedis(System.getenv("jedis_url"));
 
-		logger.log("Lambda START @ " + new Date());
+		
 		if (input.getRecords() == null || input.getRecords().isEmpty()) {
 			logger.log("Its Empty List - No records found! Lambda Ends here! @ " + new Date());
 			jedisObj.close();
