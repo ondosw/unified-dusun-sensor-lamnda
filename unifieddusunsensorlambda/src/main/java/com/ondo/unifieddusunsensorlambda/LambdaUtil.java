@@ -1,57 +1,136 @@
+ /*  INTELLECTUAL PROPERTY RIGHTS
+ *
+ *  Copyright (c) 2023 ONDO System Inc.  All Rights Reserved.
+ *
+ *  NOTICE:  All title and intellectual property rights in and to this software
+ *  product (the “Software”) (including but not limited to any images,
+ *  photographs, animations, video, audio, music, text, and any other media
+ *  incorporated into the Software), the accompanying printed materials, and
+ *  any copies of the Software are owned by ONDO System Inc. or its suppliers. The
+ *  intellectual and technical concepts contained in the Software are covered
+ *  by one or more U.S. and foreign patents as well as trade secrets and
+ *  copyright law.  All title and intellectual property rights in and to the
+ *  content that is not contained in the Software, but may be accessed through
+ *  use of the Software, is the property of the respective content owners and
+ *  may be protected by applicable copyright or other intellectual property
+ *  laws and treaties.
+ *
+ *  The Software may be used only in accordance with the terms of the license
+ *  agreement between ONDO System and its authorized licensees.  Dissemination or
+ *  reproduction of this Software or of the information contained herein is
+ *  strictly forbidden unless prior written permission is obtained from ONDO System
+ *  Inc.
+ *
+ *  EXCEPT AS MAY OTHERWISE BE EXPRESSLY SET FORTH IN A SPECIFIC LICENSE
+ *  AGREEMENT, WITH RESPECT TO THE SOFTWARE AND THE USE THEREOF, ONDO System MAKES
+ *  NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, STATUTORY OR
+ *  OTHERWISE, INCLUDING BUT NOT LIMITED TO, ANY WARRANTY OF MERCHANTABILITY,
+ *  SATISFACTORY QUALITY, NON-INFRINGEMENT OR FITNESS FOR A PARTICULAR PURPOSE.
+ *  ONDO System SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE
+ *  OR CONSEQUENTIAL DAMAGES, OR FOR ANY LOSS OF PROFITS, LOSS OF DATA, LOSS OF
+ *  BUSINESS OR LOSS OF OPPORTUNITY (WHETHER DIRECT OR INDIRECT) ARISING UNDER
+ *  THIS SOFTWARE LICENSE, AND REGARDLESS OF WHETHER THE POSSIBILITY OF ANY
+ *  SUCH LOSSES OR DAMAGES WAS FORSEEABLE OR OTHERWISE DISCLOSED TO ONDO System.
+ *  ONDO System SHALL HAVE NO LIABILITY OR OBLIGATION FOR ANY DAMAGES THAT ARISE
+ *  FROM THE USE OF A PRODUCT AS PART OF OR IN COMBINATION WITH ANY DEVICES,
+ *  PARTS OR THIRD PARTY PRODUCTS THAT ARE NOT PROVIDED BY ONDO System AND ARE
+ *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
+ *
+ *  ************************************************************************/
 package com.ondo.unifieddusunsensorlambda;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.text.DecimalFormat;
-import java.util.Date;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import redis.clients.jedis.Jedis;
 
 public class LambdaUtil {
-	static float compTemp = 0;
-	static final float lowerThreshold = (float) 30.0;
-	static final float middleThreshold = (float) 34.5;
-	static final float higherThreshold = (float) 36.5;
-	static final float minimumCompensation = (float) 1.5;
-	static final float middleCompensation = (float) 2.5;
-	static final float maximumCompensation = (float) 6.5;
-	// Any change here must be reflected in OndoServiceUtil
-	static final double indeterminateCondition = 0.7f;
+	static SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss.SSS");
 
-	static Long currentTime() {
-		return new Date().getTime();
+	@SuppressWarnings("unchecked")
+	static BandEvent parseRawDataString(Map<String, Object> map2, Jedis jedis, ObjectMapper objectMapper,
+			LambdaLogger logger, List<String> errorListRedis, String bleMacId) throws Exception {
+
+		BandEvent bandEvent = new BandEvent();
+		bandEvent.setRawData(map2.get("data").toString());
+
+		String rawDataString = map2.get("data").toString();
+
+		bandEvent.setFwVersion(Integer.valueOf(rawDataString.substring(8, 10), 16));
+		 
+		bandEvent.setGatewayBLEMacId(bleMacId);
+
+		String valuefromRedis = jedis.get(bleMacId);
+		BridgeEvent bridgeEvent = new BridgeEvent();
+		Map<String, Object> mapDataFromRedis = new HashMap<String, Object>();
+		String facilityId = null;
+		if (valuefromRedis == null) {
+			logger.log(" Value is null from Redis for GatewayBLEMacId= " + bleMacId);
+			return null;
+		} else {
+
+			mapDataFromRedis = objectMapper.readValue(valuefromRedis, mapDataFromRedis.getClass());
+			bridgeEvent.setBridgeId(mapDataFromRedis.get("bridgeId").toString());
+			if (mapDataFromRedis.containsKey("facilityId") == false) {
+				return null;
+			}
+			facilityId = mapDataFromRedis.get("facilityId").toString();
+		}
+
+		String bandId = Long.valueOf(convertBandId(rawDataString.substring(10, 18))).toString();
+
+		logger.log("Band id:: from MSG" + bandId);
+		String bandDataJSON = null;
+		String erroBandKy = "";
+		if (Integer.valueOf(bandId) >= DusunSesnsorEventHandler.tagRangeStart
+				&& Integer.valueOf(bandId) <= DusunSesnsorEventHandler.tagRangeEnd) {
+			bandDataJSON = jedis.get(DusunSesnsorEventHandler.tenant + ".tagId." + bandId);
+			erroBandKy = DusunSesnsorEventHandler.tenant + ".tagId." + bandId;
+		} else {
+			bandDataJSON = jedis.get(DusunSesnsorEventHandler.tenant + ".bandId." + bandId);
+			erroBandKy = DusunSesnsorEventHandler.tenant + ".bandId." + bandId;
+		}
+
+		if (bandDataJSON == null) {
+			errorListRedis.add(DusunSesnsorEventHandler.tenant + ".bandId." + bandId);
+			return null;
+		}
+		mapDataFromRedis = objectMapper.readValue(bandDataJSON, mapDataFromRedis.getClass());
+
+		if (mapDataFromRedis.containsKey("facilityId") == false
+				|| mapDataFromRedis.get("facilityId").toString().equalsIgnoreCase(facilityId) == false) {
+			logger.log("this is error case as facilityId DIFFRENT IN KEY  " + bandEvent.getGatewayBLEMacId()
+					+ " AND  KEY " + (erroBandKy) + mapDataFromRedis + "\n" + rawDataString);
+			return null;
+		}
+		bandEvent.setBandId(bandId);
+		bandEvent.setCurTemp(convertSkinTemp(rawDataString.substring(18, 21)));
+		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
+		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
+		bandEvent.setAccValueX(Integer.parseInt(rawDataString.substring(25, 26), 16));
+		 
+		bridgeEvent.setMacId(bleMacId);
+
+		bridgeEvent.setHeartBeatTime(Long.valueOf(map2.get("scan_time").toString() + "000"));
+
+		bandEvent.setBridgeEvent(bridgeEvent);
+
+		return bandEvent;
+
 	}
 
 	static String convertBandId(String batteryVal) {
 		return String.valueOf(Long.valueOf(batteryVal, 16));
 	}
 
-	static BandEvent parseRawDataString(final String rawDataString) {
-		BandEvent bandEvent = new BandEvent();
-		bandEvent.setRawData(rawDataString);
-
-		bandEvent.setFwVersion(Integer.valueOf(rawDataString.substring(8, 10), 16));
-		Long bandid = Long.valueOf(convertBandId(rawDataString.substring(10, 18)));
-
-		bandEvent.setBandId(bandid.toString());
-		bandEvent.setCurTemp(convertSkinTemp(rawDataString.substring(18, 21)));
-		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
-		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
-
-		bandEvent.setAccValue(Integer.valueOf(rawDataString.substring(25, 28), 16));
-
-		BridgeEvent bridgeEvent = new BridgeEvent();
-
-		// bridgeEvent.setMacId(fields[2]);
-
-		bridgeEvent.setHeartBeatTime(new Date().getTime());
-
-		bandEvent.setBridgeEvent(bridgeEvent);
-
-		return bandEvent;
+	static Float convertSkinTemp(String skinTemp) {
+		return Float.valueOf(Long.valueOf(skinTemp.substring(0, 2), 16))
+				+ (Float.valueOf(skinTemp.substring(2, 3)) / 10);
 	}
 
 	static Float convertBatteryVal(String batteryVal) {
@@ -63,157 +142,6 @@ public class LambdaUtil {
 		return Float.valueOf(Long.valueOf(ambTemp.substring(0, 2), 16)) + (Float.valueOf(ambTemp.substring(2, 3)) / 10);
 	}
 
-	static Float convertSkinTemp(String skinTemp) {
-		return Float.valueOf(Long.valueOf(skinTemp.substring(0, 2), 16))
-				+ (Float.valueOf(skinTemp.substring(2, 3)) / 10);
-	}
-
-	public static float compensateTemperatureV2(float currentTemp) {
-
-		if (currentTemp == lowerThreshold) {
-			compTemp = maximumCompensation;
-		} else if (currentTemp > lowerThreshold && currentTemp <= middleThreshold) {
-			compTemp = (float) (maximumCompensation
-					- ((maximumCompensation - middleCompensation) / (middleThreshold - lowerThreshold))
-							* (currentTemp - lowerThreshold));
-		} else if (currentTemp > middleThreshold && currentTemp <= higherThreshold) {
-			compTemp = (float) (middleCompensation
-					- ((middleCompensation - minimumCompensation) / (higherThreshold - middleThreshold))
-							* (currentTemp - middleThreshold));
-		} else if (currentTemp > higherThreshold) {
-			compTemp = minimumCompensation;
-		}
-		return compTemp <= 0 ? 0 : compTemp;
-
-	}
-
-	public static float celsiusToFahrenheit(float celsiusTemp) {
-		return (celsiusTemp * 9 / 5) + 32;
-	}
-	/*
-	 * { "data": [
-	 * "$GPRP,FA71BEF0EAB7,C1D8ACFD33AB,-51,0DFF5900060000816F1861621FFF0A094F4E444F5F42414E44,1623741675"
-	 * ] } ondo/band June 15, 2021, 12:51:09 (UTC+0530) { "data": [
-	 * "$HBRP,EE74EF551F28,EE74EF551F28,-127,00000000,1623741668" ] }
-	 *
-	 */
-
-	public static BridgeEvent parseBridgeRawDataString(final String rawDataString) {
-		BridgeEvent bridgeEvent = new BridgeEvent();
-		bridgeEvent.setRawData(rawDataString);
-		// System.out.println("Before parsing " + rawDataString);
-		String[] fields = rawDataString.split(",");
-
-		// System.out.println("Bridge fields 5 " + fields[5].toString());
-		bridgeEvent.setMacId(fields[2]);
-		if (fields.length > 5) {
-			String timePlusSth = fields[5].toString();
-			// System.out.println("timePlusSth " + timePlusSth);
-			String timeBridge = timePlusSth.substring(0, timePlusSth.length() - 4);
-			// System.out.println("timeBridge " + timeBridge);
-			Long bridgeTime = Long.parseLong(timeBridge);
-			// System.out.println("bridgeTime " + bridgeTime);
-			bridgeEvent.setHeartBeatTime(bridgeTime);
-		} else
-			bridgeEvent.setHeartBeatTime(new Date().getTime());
-
-		return bridgeEvent;
-	}
-
-	/*
-	 * Notable state �indeterminate� takes place when
-	 * 
-	 * Wrist temperature meets the alert criteria (by threshold or baseline
-	 * deviation) &&
-	 * 
-	 * WAD <= 0.7 �C
-	 */
-	// Below logic is USED BY API , any logic change here must also be done at
-	// OndoServiceUtil
-	public static boolean isDeterminateTemperature(Double curTemp, Double ambTemp, Double alertThreshold) {
-
-		DecimalFormat numberFormat = new DecimalFormat("#.#");
-
-		System.out.println("cur Temp " + curTemp + "amb Temp " + ambTemp);
-
-		if (curTemp != null && ambTemp != null && alertThreshold != null) {
-
-			if (curTemp < alertThreshold) {
-				return true; // determinate
-			} else {
-				// double diff = Math.abs(curTemp - ambTemp);
-
-				if (Double.valueOf(numberFormat.format(Math.abs(curTemp - ambTemp))) <= indeterminateCondition) {
-					return false; // Not determinate
-				} else {
-					return true; // determinate
-				}
-			}
-		} else
-			return false;
-	}
-
-	// User by Lambda for Warning Temperature
-	public static boolean isDeterminateTemperatureFloat(Float curTemp, Float ambTemp, Float alertThreshold) {
-
-		DecimalFormat numberFormat = new DecimalFormat("#.#");
-
-		if (curTemp != null && ambTemp != null) {
-
-			int indeterminateCondition2 = Float.compare(ambTemp, alertThreshold);
-
-			if (indeterminateCondition2 >= 0) {
-
-				return false; // Not determinate
-			}
-
-			if (Double.valueOf(numberFormat.format(Math.abs(curTemp - ambTemp))) <= indeterminateCondition) {
-				return false; // Not determinate
-			} else {
-				return true; // determinate
-			}
-
-		} else
-			return false;
-	}
-
-	public static String compress(String str, String inEncoding) {
-		if (str == null || str.length() == 0) {
-			return str;
-		}
-		try {
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			GZIPOutputStream gzip = new GZIPOutputStream(out);
-			gzip.write(str.getBytes(inEncoding));
-			gzip.close();
-			return URLEncoder.encode(out.toString("ISO-8859-1"), "UTF-8");
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
-
-	public static String decompress(String str, String outEncoding) {
-		if (str == null || str.length() == 0) {
-			return str;
-		}
-
-		try {
-			String decode = URLDecoder.decode(str, "UTF-8");
-
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			ByteArrayInputStream in = new ByteArrayInputStream(decode.getBytes("ISO-8859-1"));
-			GZIPInputStream gunzip = new GZIPInputStream(in);
-			byte[] buffer = new byte[256];
-			int n;
-			while ((n = gunzip.read(buffer)) >= 0) {
-				out.write(buffer, 0, n);
-			}
-			return out.toString(outEncoding);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
+ 
 
 }
