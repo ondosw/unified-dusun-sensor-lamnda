@@ -45,6 +45,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  
 public class WearerInfo {
 	
+	@JsonProperty("fwVersion")
+	private Integer fwVersion;
+	@JsonProperty("alertThreshold")
+	private Float alertThreshold;
 	@JsonProperty("wearerId")
 	private String wearerId;
 	
@@ -296,16 +300,23 @@ public class WearerInfo {
 		this.locationWarningSentTime = locationWarningSentTime;
 	}
 
-	@Override
-	public String toString() {
-		return "WearerInfo [wearerId=" + wearerId + ", firstName=" + firstName + ", lastName=" + lastName
-				+ ", facilityId=" + facilityId + ", bandId=" + bandId + ", wearerGroupId=" + wearerGroupId
-				+ ", alertThresholdId=" + alertThresholdId + ", alertSpike=" + alertSpike + ", localId=" + localId
-				+ ", baseLine=" + baseLine + ", createdDate=" + createdDate + ", pNEligible=" + pNEligible
-				+ ", pNSentTime=" + pNSentTime + ", lastWarningTempTime=" + lastWarningTempTime + ", lastWarningTemp="
-				+ lastWarningTemp + ", lastTempTime=" + lastTempTime + ", lastTemp=" + lastTemp + ", location="
-				+ location + ", locationAlert=" + locationAlert + ", gracePeriod=" + gracePeriod + "]";
+	public Integer getFwVersion() {
+		return fwVersion;
 	}
+
+	public void setFwVersion(Integer fwVersion) {
+		this.fwVersion = fwVersion;
+	}
+
+	public Float getAlertThreshold() {
+		return alertThreshold;
+	}
+
+	public void setAlertThreshold(Float alertThreshold) {
+		this.alertThreshold = alertThreshold;
+	}
+
+	 
 	
 	
 	

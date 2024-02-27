@@ -49,7 +49,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.BatchWriteItemRequest;
+import com.amazonaws.services.dynamodbv2.model.BatchWriteItemResult;
+import com.amazonaws.services.dynamodbv2.model.PutRequest;
+import com.amazonaws.services.dynamodbv2.model.WriteRequest;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
@@ -65,7 +73,8 @@ import redis.clients.jedis.Jedis;
 
 public class DusunSesnsorEventHandler
 		implements RequestHandler<KinesisFirehoseEvent, KinesisAnalyticsInputPreprocessingResponse> {
-
+ 
+	static final int smalllerTTLForDashboard = 25;
 	static Integer bandRangeEnd = null;
 
 	static Integer bandRangeStart = null;
@@ -74,10 +83,13 @@ public class DusunSesnsorEventHandler
 
 	static Integer tagRangeStart = null;
 	static String tenant = null;
+	static AmazonDynamoDB ddb=null;
+	static final int SixMonthsTTLForTempLookup = 5000;
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public KinesisAnalyticsInputPreprocessingResponse handleRequest(KinesisFirehoseEvent input, Context context) {
+		  ddb=  AmazonDynamoDBClientBuilder.defaultClient();
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
 		objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -245,11 +257,107 @@ public class DusunSesnsorEventHandler
 		} catch (Exception e) {
 			logger.log(e.getMessage());
 		}
-		
+		List<DBRecord> dbRecords = new ArrayList<DBRecord>();
 
+		// Stopwatch bandStopWatch = new Stopwatch();
+		// bandStopWatch.StartTiming();
+
+		try {
+			System.out.println("##############UNIFIED + Before PrepareDBRecord ");
+
+			dbRecords = prepareDBRecord(wearerInfoMap,  allBandEvents,objectMapper,jedisObj,tenant );
+		}   catch (Exception e1) {
+			 
+			e1.printStackTrace();
+		}
+		List<String> failRecordIdList = prepareToInsertIntoDB(dbRecords);
+
+		for (String string : failRecordIdList) {
+			for (KinesisAnalyticsInputPreprocessingResponse.Record txRecord : recordList) {
+				if (txRecord.getRecordId().equalsIgnoreCase(string)) {
+					txRecord.setResult(Result.ProcessingFailed);
+				}
+			}
+		}
+		failRecordIdList = prepareToInsertIntoTempLookupTable(dbRecords);
+		for (String string : failRecordIdList) {
+			for (KinesisAnalyticsInputPreprocessingResponse.Record txRecord : recordList) {
+				if (txRecord.getRecordId().equalsIgnoreCase(string)) {
+					txRecord.setResult(Result.ProcessingFailed);
+				}
+			}
+		}
 		response.setRecords(recordList);
 		logger.log("Lambda END @ " + new Date());
 		return response;
+	}
+	private List<String> prepareToInsertIntoTempLookupTable(List<DBRecord> dbRecords) {
+		List<String> failRecord = new ArrayList<>();
+		int j = 1;
+		Map<PutRequest, String> idtorcrodId = new HashMap<>();
+		List<String> allRecid = new ArrayList<String>();
+		for (int i = 0; i < dbRecords.size() /* && i < 25 */; i++) {
+
+			List<WriteRequest> writeRequests = new ArrayList<>(dbRecords.size());
+
+			for (j = 1; j <= 25 && i < dbRecords.size(); j++, i++) {
+				DBRecord dbRecord = dbRecords.get(i);
+				PutRequest putRequest = new PutRequest();
+				putRequest.addItemEntry("id", new AttributeValue().withS(dbRecord.getId()));
+
+				putRequest.addItemEntry("bandId", new AttributeValue().withS(dbRecord.getBandId()));
+				putRequest.addItemEntry("batVolt", new AttributeValue().withN(String.valueOf(dbRecord.getBatVolt())));
+				putRequest.addItemEntry("curTemp", new AttributeValue().withN(String.valueOf(dbRecord.getCurTemp())));
+				putRequest.addItemEntry("ambTemp", new AttributeValue().withN(String.valueOf(dbRecord.getAmbTemp())));
+				putRequest.addItemEntry("accVal", new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+
+				putRequest.addItemEntry("fcltyId", new AttributeValue().withS(dbRecord.getFcltyId()));
+				putRequest.addItemEntry("curTime", new AttributeValue().withN(String.valueOf(dbRecord.getCurTime())));
+				putRequest.addItemEntry("ttl",
+						new AttributeValue().withN("" + EpochTime.epochTTL(SixMonthsTTLForTempLookup)));
+				putRequest.addItemEntry("wearerId", new AttributeValue().withS(String.valueOf(dbRecord.getWearerId())));
+				putRequest.addItemEntry("rssi", new AttributeValue().withN(String.valueOf(dbRecord.getRssi())));
+				putRequest.addItemEntry("fwVersion",
+						new AttributeValue().withN(String.valueOf(dbRecord.getFwVersion())));
+				putRequest.addItemEntry("gatewayBLEMacId", new AttributeValue().withS(dbRecord.getGatewayBLEMacId()));
+				WriteRequest writeRequest = new WriteRequest(putRequest);
+				idtorcrodId.put(putRequest, dbRecord.getRecordId());
+				allRecid.add(dbRecord.getRecordId());
+				writeRequests.add(writeRequest);
+			}
+
+			// Do batching
+			BatchWriteItemRequest request = new BatchWriteItemRequest();
+			request.addRequestItemsEntry("ondoreport", writeRequests);
+
+			// System.out.println("#########JUST BEFORE INSERT " + writeRequests.size());
+
+			i--;
+			try {
+				System.out.println("Saving In ondoreport" + request);
+				BatchWriteItemResult batchWriteItemResult = ddb.batchWriteItem(request);
+
+				if (batchWriteItemResult.getUnprocessedItems() != null) {
+					List<WriteRequest> unprocessedItems = batchWriteItemResult.getUnprocessedItems().get("ondoreport");
+					if (unprocessedItems != null) {
+						for (WriteRequest writeRequest : unprocessedItems) {
+							failRecord.add(idtorcrodId.get(writeRequest.getPutRequest()));
+							System.out.println("FAIL @ ondoreport " + writeRequest.getPutRequest());
+						}
+					}
+
+				}
+			} catch (Exception e) {
+				System.err.println(e.getMessage());
+				e.getMessage();
+				failRecord.addAll(allRecid);
+			}
+
+			// Reinitialize j for anothr batch of 25 records or less
+			j = 1;
+		}
+		return failRecord;
+
 	}
 
 	private void updateHeartBeat(BridgeInfo bridgeInfo, BridgeEvent bridgeEvent, Jedis jedis,
@@ -332,6 +440,167 @@ public class DusunSesnsorEventHandler
 
 		}
 		return ret;
+	}
+
+	static final Long deduptime = 1000L * 60;
+
+	@SuppressWarnings("unchecked")
+	private Boolean recordLastTempAndTime(WearerInfo wInfo, BandEvent bandEvent, ObjectMapper objectMapper,
+			Jedis jedisObj, String tenants) throws Exception {
+		try {
+			Integer bandid = Integer.valueOf(wInfo.getBandId());
+			if (bandid >= bandRangeStart && bandid <= bandRangeEnd) {
+				WearerInfo wearerInfo = objectMapper.readValue(jedisObj.get(tenants + ".bandId." + wInfo.getBandId()),
+						WearerInfo.class);
+				wearerInfo.setLastTemp(bandEvent.getCurTemp());
+				wearerInfo.setLastTempTime(new Date().getTime());
+				wearerInfo.setFwVersion(bandEvent.getFwVersion());
+				jedisObj.set(tenants + ".bandId." + wInfo.getBandId(), objectMapper.writeValueAsString(wearerInfo));
+			} else if (bandid >= tagRangeStart && bandid <= tagRangeEnd) {
+				Map<String, Object> tagData = new HashMap<>();
+				tagData = objectMapper.readValue(jedisObj.get(tenants + ".tagId." + wInfo.getBandId()),
+						tagData.getClass());
+				if (tagData == null) {
+					tagData = new HashMap<>();
+					tagData.put("tagId", bandid);
+				}
+				tagData.put("lastTemp", bandEvent.getCurTemp());
+				tagData.put("lastTempTime", new Date().getTime());
+				tagData.put("fwVersion", bandEvent.getFwVersion());
+				jedisObj.set(tenants + ".tagId." + wInfo.getBandId(), objectMapper.writeValueAsString(tagData));
+				return false;
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+		return true;
+	}
+
+	private List<String> prepareToInsertIntoDB(List<DBRecord> dbRecords) {
+
+		List<String> failRecord = new ArrayList<>();
+		int j = 1;
+		for (int i = 0; i < dbRecords.size() /* && i < 25 */; i++) {
+			List<String> allRecid = new ArrayList<String>();
+			List<WriteRequest> writeRequests = new ArrayList<>(dbRecords.size());
+			Map<PutRequest, String> idtorcrodId = new HashMap<>();
+			for (j = 1; j <= 25 && i < dbRecords.size(); j++, i++) {
+
+				DBRecord dbRecord = dbRecords.get(i);
+
+				PutRequest putRequest = new PutRequest();
+				putRequest.addItemEntry("id", new AttributeValue().withS(dbRecord.getId()));
+
+				putRequest.addItemEntry("bandId", new AttributeValue().withS(dbRecord.getBandId()));
+
+				Integer bandid = Integer.valueOf(dbRecord.getBandId());
+				if (bandid >= bandRangeStart && bandid <= bandRangeEnd) {
+					putRequest.addItemEntry("batVolt",
+							new AttributeValue().withN(String.valueOf(dbRecord.getBatVolt())));
+					putRequest.addItemEntry("curTemp",
+							new AttributeValue().withN(String.valueOf(dbRecord.getCurTemp())));
+					putRequest.addItemEntry("ambTemp",
+							new AttributeValue().withN(String.valueOf(dbRecord.getAmbTemp())));
+					putRequest.addItemEntry("accVal",
+							new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+					putRequest.addItemEntry("displayName",
+							new AttributeValue().withS(dbRecord.getFName() + " ---->> " + dbRecord.getLName()));
+					putRequest.addItemEntry("fcltyId", new AttributeValue().withS(dbRecord.getFcltyId()));
+
+					putRequest.addItemEntry("curTime",
+							new AttributeValue().withN(String.valueOf(dbRecord.getCurTime())));
+					putRequest.addItemEntry("ttl",
+							new AttributeValue().withN("" + EpochTime.epochTTL(smalllerTTLForDashboard)));
+					putRequest.addItemEntry("wearerId",
+							new AttributeValue().withS(String.valueOf(dbRecord.getWearerId())));
+					WriteRequest writeRequest = new WriteRequest(putRequest);
+					writeRequests.add(writeRequest);
+				}
+
+			}
+
+			// Do batching
+			BatchWriteItemRequest request = new BatchWriteItemRequest();
+			request.addRequestItemsEntry("unified-dashboard", writeRequests);
+
+			// System.out.println("#########JUST BEFORE INSERT " + writeRequests.size());
+
+			i--;
+			try {
+				System.out.println("Saving In dashboard" + request);
+				BatchWriteItemResult batchWriteItemResult = ddb.batchWriteItem(request);
+
+				if (batchWriteItemResult.getUnprocessedItems() != null) {
+					List<WriteRequest> unprocessedItems = batchWriteItemResult.getUnprocessedItems()
+							.get("unified-dashboard");
+					if (unprocessedItems != null) {
+						for (WriteRequest writeRequest : unprocessedItems) {
+							System.out.println("Fail @ Dashboard " + writeRequest.getPutRequest());
+							failRecord.add(idtorcrodId.get(writeRequest.getPutRequest()));
+						}
+					}
+
+				}
+			} catch (Exception e) {
+				failRecord.addAll(allRecid);
+				System.err.println(e.getMessage());
+				e.getMessage();
+			}
+
+			j = 1;
+		}
+		return failRecord;
+	}
+
+	private  List<DBRecord> prepareDBRecord(Map<String, WearerInfo> wearerInfoMap, List<BandEvent> bandEvents,
+			ObjectMapper objectMapper, Jedis jedis, String tenant) throws Exception {
+		List<DBRecord> dbRecords = new ArrayList<>();
+		for (BandEvent bandEvent : bandEvents) {
+
+			WearerInfo wearerInfo = wearerInfoMap.get(bandEvent.getBandId());
+
+			Long timeDiff = 0L;
+
+			if ((null != wearerInfo) && (null != wearerInfo.getLastTempTime())) {
+				timeDiff = LambdaUtil.currentTime() - wearerInfo.getLastTempTime();
+
+			}
+
+			if ((null != wearerInfo) && (timeDiff >= deduptime)
+					|| (null != wearerInfo) && (null == wearerInfo.getLastTempTime())
+					|| (null != wearerInfo) && bandEvent.getAccValue() == 0) // ODR
+
+			{
+				System.out.println("#########UNIFIED " + "Inside Dedup check");
+				WearerInfo wInfo = wearerInfoMap.get(bandEvent.getBandId());
+				Boolean band = recordLastTempAndTime(wInfo, bandEvent, objectMapper, jedis, tenant);
+				if (band) {
+					DBRecord dbRecord = mapToDBRecord(wearerInfoMap.get(bandEvent.getBandId()), bandEvent);
+					System.out.println("dbRecord==================>>>" + dbRecord.getWearerId());
+					dbRecord.setRecordId(bandEvent.getRecordId());
+					dbRecords.add(dbRecord);
+				}
+
+			}
+		}
+		return dbRecords;
+	}
+	private DBRecord mapToDBRecord(WearerInfo wearerInfo, BandEvent bandEvent) throws NumberFormatException, Exception {
+
+		DBRecord dbRecord = DBRecord.builder().setId(UUID.randomUUID().toString()).setBandId(wearerInfo.getBandId())
+				.setWearerId(wearerInfo.getWearerId()).setFcltyId(wearerInfo.getFacilityId())
+				.setfName(wearerInfo.getFirstName()).setlName(wearerInfo.getLastName())
+				.setGrpId(wearerInfo.getWearerGroupId())
+				.setAltTH(wearerInfo.getAlertThreshold() != null
+						? Double.valueOf(String.valueOf(wearerInfo.getAlertThreshold()))
+						: null)
+				.setAmbTemp(bandEvent.getAmbTemp()).setBatVolt(Double.valueOf(String.valueOf(bandEvent.getBattery())))
+				.setCurTemp(Double.valueOf(String.valueOf(bandEvent.getCurTemp()))).setAccValue(bandEvent.getAccValue())
+				.setCurTime(new Date().getTime()).setFwVersion(bandEvent.getFwVersion()).setRssi(bandEvent.getRssi())
+				.setGatewayBLEMacId(bandEvent.getGatewayBLEMacId()).build();
+		return dbRecord;
 	}
 
 }

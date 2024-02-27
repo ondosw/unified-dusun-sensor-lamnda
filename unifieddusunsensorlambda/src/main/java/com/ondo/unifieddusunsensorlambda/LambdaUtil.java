@@ -40,6 +40,7 @@
 package com.ondo.unifieddusunsensorlambda;
 
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,9 @@ import redis.clients.jedis.Jedis;
 
 public class LambdaUtil {
 	static SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss.SSS");
-
+	static Long currentTime() {
+		return new Date().getTime();
+	}
 	@SuppressWarnings("unchecked")
 	static BandEvent parseRawDataString(Map<String, Object> map2, Jedis jedis, ObjectMapper objectMapper,
 			LambdaLogger logger, List<String> errorListRedis, String bleMacId) throws Exception {
