@@ -26,12 +26,13 @@ public class LambdaLogic {
 	static final int SixMonthsTTLForTempLookup = 5000;
 
 	@SuppressWarnings("unchecked")
-	public static void doLogic(List<Map<String, Object>> dataList,  ObjectMapper objectMapper,
+	public static void doLogic(List<Map<String, Object>> dataList, ObjectMapper objectMapper,
 			Map<String, Long> bridgeMacIdsAndHeartBeatTime, Jedis jedisObj, Integer bandRangeStart,
 			Integer bandRangeEnd, Integer tagRangeStart, Integer tagRangeEnd, String tenant,
 			List<KinesisAnalyticsInputPreprocessingResponse.Record> recordList, AmazonDynamoDB ddb) {
 		List<Map<String, Object>> filteredDataList = new ArrayList<>();
 		Map<String, List<Map<String, Object>>> bleMacIdsAndfilteredDataList = new HashMap<>();
+		Set<String> duplicateCheck = new HashSet<>();
 		for (Map<String, Object> map : dataList) {
 
 			Map<String, Object> data = (Map<String, Object>) map.get("data");
@@ -51,9 +52,11 @@ public class LambdaLogic {
 				List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
 				for (Map<String, Object> map2 : device_list) {
 					if (map2.get("connectable") != null) {
-						if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false) {
+						if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false
+								&& !duplicateCheck.contains(map2.get("data").toString())) {
 							filteredDataList.add(map2);
 							System.out.println("SENSOR DATA");
+							duplicateCheck.add(map2.get("data").toString());
 						}
 					}
 				}
@@ -70,8 +73,8 @@ public class LambdaLogic {
 			for (Map<String, Object> map2 : bleMacIdsAndfilteredDataList.get(bleMqacId)) {
 
 				try {
-					BandEvent bandEvent = LambdaUtil.parseRawDataString(map2, jedisObj, objectMapper, 
-							errorListRedis, bleMqacId);
+					BandEvent bandEvent = LambdaUtil.parseRawDataString(map2, jedisObj, objectMapper, errorListRedis,
+							bleMqacId);
 					if (Long.valueOf(bandEvent.getBandId()) >= bandRangeStart
 							&& Long.valueOf(bandEvent.getBandId()) <= bandRangeEnd) {
 						allBandEvents.add(bandEvent);
