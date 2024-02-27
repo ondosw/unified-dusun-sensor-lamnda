@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import redis.clients.jedis.Jedis;
@@ -57,7 +56,7 @@ public class LambdaUtil {
 	}
 	@SuppressWarnings("unchecked")
 	static BandEvent parseRawDataString(Map<String, Object> map2, Jedis jedis, ObjectMapper objectMapper,
-			LambdaLogger logger, List<String> errorListRedis, String bleMacId) throws Exception {
+			  List<String> errorListRedis, String bleMacId) throws Exception {
 
 		BandEvent bandEvent = new BandEvent();
 		bandEvent.setRawData(map2.get("data").toString());
@@ -73,7 +72,7 @@ public class LambdaUtil {
 		Map<String, Object> mapDataFromRedis = new HashMap<String, Object>();
 		String facilityId = null;
 		if (valuefromRedis == null) {
-			logger.log(" Value is null from Redis for GatewayBLEMacId= " + bleMacId);
+			System.out.println(" Value is null from Redis for GatewayBLEMacId= " + bleMacId);
 			return null;
 		} else {
 
@@ -87,7 +86,7 @@ public class LambdaUtil {
 
 		String bandId = Long.valueOf(convertBandId(rawDataString.substring(10, 18))).toString();
 
-		logger.log("Band id:: from MSG" + bandId);
+		System.out.println("Band id:: from MSG" + bandId);
 		String bandDataJSON = null;
 		String erroBandKy = "";
 		if (Integer.valueOf(bandId) >= DusunSesnsorEventHandler.tagRangeStart
@@ -107,7 +106,7 @@ public class LambdaUtil {
 
 		if (mapDataFromRedis.containsKey("facilityId") == false
 				|| mapDataFromRedis.get("facilityId").toString().equalsIgnoreCase(facilityId) == false) {
-			logger.log("this is error case as facilityId DIFFRENT IN KEY  " + bandEvent.getGatewayBLEMacId()
+			System.out.println("this is error case as facilityId DIFFRENT IN KEY  " + bandEvent.getGatewayBLEMacId()
 					+ " AND  KEY " + (erroBandKy) + mapDataFromRedis + "\n" + rawDataString);
 			return null;
 		}
