@@ -135,7 +135,7 @@ public class DusunSesnsorEventHandler
 
 		Jedis jedisObj = new Jedis(System.getenv("jedis_url"));
 		logger.log("Initial Record Size =  " + input.getRecords().size());
-
+		Map<String, Long> bridgeMacIdsAndHeartBeatTime = new HashMap<>();
 		List<Map<String, Object>> dataList = new ArrayList<>();
 		for (Record record : input.getRecords()) {
 
@@ -160,18 +160,29 @@ public class DusunSesnsorEventHandler
 		for (Map<String, Object> map : dataList) {
 
 			Map<String, Object> data = (Map<String, Object>) map.get("data");
+			if (data.get("attribute") != null && data.get("mac") != null
+					&& data.get("attribute").toString().equalsIgnoreCase("gateway.heartbeat")) {
+				String macId = map.get("mac").toString().replace(":", "");
+				Map<String, Object> data_value = (Map<String, Object>) data.get("value");
+				bridgeMacIdsAndHeartBeatTime.put(macId,
+						Long.valueOf(data_value.get("current_time").toString() + "000"));
 
-			Map<String, Object> data_value = (Map<String, Object>) data.get("value");
+			}
 
-			List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
-			for (Map<String, Object> map2 : device_list) {
-				if (map2.get("connectable") != null) {
-					if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false) {
-						filteredDataList.add(map2);
+			else {
+				Map<String, Object> data_value = (Map<String, Object>) data.get("value");
+
+				List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
+				for (Map<String, Object> map2 : device_list) {
+					if (map2.get("connectable") != null) {
+						if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false) {
+							filteredDataList.add(map2);
+						}
 					}
 				}
+				bleMacIdsAndfilteredDataList.put(map.get("ble_addr").toString().replace(":", ""), filteredDataList);
 			}
-			bleMacIdsAndfilteredDataList.put(map.get("ble_addr").toString().replace(":", ""), filteredDataList);
+
 		}
 		System.out.println("TOTALconnectable RECORD=" + filteredDataList.size());
 
@@ -218,10 +229,56 @@ public class DusunSesnsorEventHandler
 			e.printStackTrace();
 		}
 		logger.log("wearerInfoMap=" + wearerInfoMap);
+		try {
+			Map<String, BridgeInfo> bridgeInfoMap = getBridgeDetails(bridgeMacIdsAndHeartBeatTime.keySet(), jedisObj,
+					objectMapper);
+
+			for (String mid : bridgeInfoMap.keySet()) {
+				BridgeInfo bridgeInfo = bridgeInfoMap.get(mid);
+				BridgeEvent bridgeEvent = new BridgeEvent();
+				bridgeEvent.setMacId(mid);
+				bridgeEvent.setHeartBeatTime(bridgeMacIdsAndHeartBeatTime.get(mid));
+				bridgeEvent.setBridgeId(bridgeInfo.getBridgeId());
+				updateHeartBeat(bridgeInfo, bridgeEvent, jedisObj, objectMapper);
+			}
+
+		} catch (Exception e) {
+			logger.log(e.getMessage());
+		}
+		
 
 		response.setRecords(recordList);
 		logger.log("Lambda END @ " + new Date());
 		return response;
+	}
+
+	private void updateHeartBeat(BridgeInfo bridgeInfo, BridgeEvent bridgeEvent, Jedis jedis,
+			ObjectMapper objectMapper) {
+		if (bridgeEvent.getMacId() != null) {
+			String vals = jedis.get(bridgeEvent.getMacId());
+			try {
+				if (vals == null) {
+
+					BridgeRedisDTO bridgeRedisObject = new BridgeRedisDTO();
+					bridgeRedisObject.setLastHeartBeatTime(new Date().getTime());
+					bridgeRedisObject.setBleMacId(bridgeEvent.getMacId());
+					bridgeRedisObject.setFacilityId(bridgeInfo.getFacilityId());
+					bridgeRedisObject.setBridgeName(bridgeInfo.getBridgeName());
+					bridgeRedisObject.setBridgeId(bridgeInfo.getBridgeId());
+					jedis.set(bridgeEvent.getMacId(), objectMapper.writeValueAsString(bridgeRedisObject));
+
+				} else {
+
+					BridgeRedisDTO bridgeRedisObject = objectMapper.readValue(vals, BridgeRedisDTO.class);
+					bridgeRedisObject.setLastHeartBeatTime(new Date().getTime());
+					jedis.set(bridgeEvent.getMacId(), objectMapper.writeValueAsString(bridgeRedisObject));
+
+				}
+			} catch (Exception e) {
+				System.out.print(e.getMessage());
+			}
+		}
+
 	}
 
 	@SuppressWarnings("unchecked")
@@ -253,6 +310,28 @@ public class DusunSesnsorEventHandler
 		}
 
 		return returnMap;
+	}
+
+	private Map<String, BridgeInfo> getBridgeDetails(Set<String> macIds, Jedis jedis, ObjectMapper objectMapper)
+			throws Exception {
+		Map<String, BridgeInfo> ret = new HashMap<>();
+
+		if (macIds == null || macIds.size() == 0) {
+
+		} else {
+
+			for (String string : macIds) {
+				String val = jedis.get(string);
+
+				if (val != null) {
+					BridgeInfo bridgeInfo = objectMapper.readValue(val, BridgeInfo.class);
+					ret.put(string, bridgeInfo);
+				}
+
+			}
+
+		}
+		return ret;
 	}
 
 }
