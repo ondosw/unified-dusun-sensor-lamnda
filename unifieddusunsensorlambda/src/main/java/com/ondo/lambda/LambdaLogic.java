@@ -180,7 +180,10 @@ public class LambdaLogic {
 				putRequest.addItemEntry("batVolt", new AttributeValue().withN(String.valueOf(dbRecord.getBatVolt())));
 				putRequest.addItemEntry("curTemp", new AttributeValue().withN(String.valueOf(dbRecord.getCurTemp())));
 				putRequest.addItemEntry("ambTemp", new AttributeValue().withN(String.valueOf(dbRecord.getAmbTemp())));
-				putRequest.addItemEntry("accVal", new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+				if(dbRecord.getAccValue()!=null) {
+					putRequest.addItemEntry("accVal", new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+				}
+				
 
 				putRequest.addItemEntry("fcltyId", new AttributeValue().withS(dbRecord.getFcltyId()));
 				putRequest.addItemEntry("curTime", new AttributeValue().withN(String.valueOf(dbRecord.getCurTime())));
