@@ -89,17 +89,17 @@ public class LambdaUtil {
 		System.out.println("Band id:: from MSG = " + bandId);
 		String bandDataJSON = null;
 		String erroBandKy = "";
-		if (Integer.valueOf(bandId) >= FirehoseEventHandler.tagRangeStart
-				&& Integer.valueOf(bandId) <= FirehoseEventHandler.tagRangeEnd) {
-			bandDataJSON = jedis.get(FirehoseEventHandler.tenant + ".tagId." + bandId);
-			erroBandKy = FirehoseEventHandler.tenant + ".tagId." + bandId;
+		if (Integer.valueOf(bandId) >= UnifiedDusunSensorEventHandler.tagRangeStart
+				&& Integer.valueOf(bandId) <= UnifiedDusunSensorEventHandler.tagRangeEnd) {
+			bandDataJSON = jedis.get(UnifiedDusunSensorEventHandler.tenant + ".tagId." + bandId);
+			erroBandKy = UnifiedDusunSensorEventHandler.tenant + ".tagId." + bandId;
 		} else {
-			bandDataJSON = jedis.get(FirehoseEventHandler.tenant + ".bandId." + bandId);
-			erroBandKy = FirehoseEventHandler.tenant + ".bandId." + bandId;
+			bandDataJSON = jedis.get(UnifiedDusunSensorEventHandler.tenant + ".bandId." + bandId);
+			erroBandKy = UnifiedDusunSensorEventHandler.tenant + ".bandId." + bandId;
 		}
 
 		if (bandDataJSON == null) {
-			errorListRedis.add(FirehoseEventHandler.tenant + ".bandId." + bandId);
+			errorListRedis.add(UnifiedDusunSensorEventHandler.tenant + ".bandId." + bandId);
 			return null;
 		}
 		mapDataFromRedis = objectMapper.readValue(bandDataJSON, mapDataFromRedis.getClass());

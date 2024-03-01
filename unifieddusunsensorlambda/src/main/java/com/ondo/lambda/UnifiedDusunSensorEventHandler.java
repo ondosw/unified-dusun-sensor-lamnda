@@ -62,7 +62,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import redis.clients.jedis.Jedis;
 
-public class FirehoseEventHandler
+public class UnifiedDusunSensorEventHandler
 		implements RequestHandler<KinesisFirehoseEvent, KinesisAnalyticsInputPreprocessingResponse> {
 
 
