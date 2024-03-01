@@ -219,7 +219,7 @@ public class LambdaLogic {
 				}
 			} catch (Exception e) {
 				System.err.println(e.getMessage());
-				e.getMessage();
+				 
 				failRecord.addAll(allRecid);
 			}
 
@@ -375,8 +375,11 @@ public class LambdaLogic {
 							new AttributeValue().withN(String.valueOf(dbRecord.getCurTemp())));
 					putRequest.addItemEntry("ambTemp",
 							new AttributeValue().withN(String.valueOf(dbRecord.getAmbTemp())));
-					putRequest.addItemEntry("accVal",
-							new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+					if(dbRecord.getAccValue()!=null) {
+						putRequest.addItemEntry("accVal",
+								new AttributeValue().withN(String.valueOf(dbRecord.getAccValue())));
+					}
+					
 					putRequest.addItemEntry("displayName",
 							new AttributeValue().withS(dbRecord.getFName() + " ---->> " + dbRecord.getLName()));
 					putRequest.addItemEntry("fcltyId", new AttributeValue().withS(dbRecord.getFcltyId()));
