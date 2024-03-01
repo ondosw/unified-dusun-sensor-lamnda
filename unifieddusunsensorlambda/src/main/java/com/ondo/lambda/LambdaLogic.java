@@ -75,7 +75,10 @@ public class LambdaLogic {
 				try {
 					BandEvent bandEvent = LambdaUtil.parseRawDataString(map2, jedisObj, objectMapper, errorListRedis,
 							bleMqacId);
-					if (Long.valueOf(bandEvent.getBandId()) >= bandRangeStart
+					if(bandEvent==null) {
+						System.out.println( "NULL BAND EVENT");
+					}
+					else if (Long.valueOf(bandEvent.getBandId()) >= bandRangeStart
 							&& Long.valueOf(bandEvent.getBandId()) <= bandRangeEnd) {
 						allBandEvents.add(bandEvent);
 						bandIds.add(bandEvent.getBandId());
@@ -245,7 +248,7 @@ public class LambdaLogic {
 					dat = objectMapper.readValue(json, dat.getClass());
 
 					WearerInfo wearerInfo = new WearerInfo();
-					System.out.println(dat);
+			 
 					if (dat.containsKey("AssetId")) {
 						wearerInfo.setWearerId(dat.get("AssetId").toString());
 					} else if (dat.containsKey("wearerId")) {
