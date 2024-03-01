@@ -1,4 +1,4 @@
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;

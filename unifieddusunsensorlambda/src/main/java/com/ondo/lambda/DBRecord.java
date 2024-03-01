@@ -1,4 +1,4 @@
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import org.apache.commons.beanutils.BeanUtils;
 

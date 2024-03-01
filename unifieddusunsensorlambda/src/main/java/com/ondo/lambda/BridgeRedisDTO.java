@@ -39,25 +39,18 @@
  *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
  *
  *  ************************************************************************/
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+public class BridgeRedisDTO {
 
-public class BridgeInfo {
-
-	@JsonProperty("bridgeId")
 	private String bridgeId;
 
-	@JsonProperty("facilityId")
 	private String facilityId;
 
-	@JsonProperty("bleMacId")
 	private String bleMacId;
 
-	@JsonProperty("bridgeName")
 	private String bridgeName;
 
-	@JsonProperty("lastHeartBeatTime")
 	private Long lastHeartBeatTime;
 
 	public String getBridgeId() {
@@ -99,13 +92,5 @@ public class BridgeInfo {
 	public void setLastHeartBeatTime(Long lastHeartBeatTime) {
 		this.lastHeartBeatTime = lastHeartBeatTime;
 	}
-
-	@Override
-	public String toString() {
-		return "BridgeInfo [bridgeId=" + bridgeId + ", facilityId=" + facilityId + ", bleMacId=" + bleMacId
-				+ ", bridgeName=" + bridgeName + ", lastHeartBeatTime=" + lastHeartBeatTime + "]";
-	}
-	
-	
 
 }

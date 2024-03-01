@@ -37,7 +37,7 @@
  *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
  *
  *  ************************************************************************/
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -56,23 +56,23 @@ public class LambdaUtil {
 	}
 	@SuppressWarnings("unchecked")
 	static BandEvent parseRawDataString(Map<String, Object> map2, Jedis jedis, ObjectMapper objectMapper,
-			  List<String> errorListRedis, String bleMacId) throws Exception {
-
+			  List<String> errorListRedis, String bleMqacId) throws Exception { 
+		bleMqacId=bleMqacId.toUpperCase();
 		BandEvent bandEvent = new BandEvent();
 		bandEvent.setRawData(map2.get("data").toString());
 
 		String rawDataString = map2.get("data").toString();
 
 		bandEvent.setFwVersion(Integer.valueOf(rawDataString.substring(8, 10), 16));
-		 
-		bandEvent.setGatewayBLEMacId(bleMacId);
+		bandEvent.setRssi(Integer.parseInt((map2.get("scan_rssi").toString())));
+		bandEvent.setGatewayBLEMacId(bleMqacId);
 
-		String valuefromRedis = jedis.get(bleMacId);
+		String valuefromRedis = jedis.get(bleMqacId);
 		BridgeEvent bridgeEvent = new BridgeEvent();
 		Map<String, Object> mapDataFromRedis = new HashMap<String, Object>();
 		String facilityId = null;
 		if (valuefromRedis == null) {
-			System.out.println(" Value is null from Redis for GatewayBLEMacId= " + bleMacId);
+			System.out.println(" Value is null from Redis for GatewayBLEMacId= " + bleMqacId);
 			return null;
 		} else {
 
@@ -86,20 +86,20 @@ public class LambdaUtil {
 
 		String bandId = Long.valueOf(convertBandId(rawDataString.substring(10, 18))).toString();
 
-		System.out.println("Band id:: from MSG" + bandId);
+		System.out.println("Band id:: from MSG = " + bandId);
 		String bandDataJSON = null;
 		String erroBandKy = "";
-		if (Integer.valueOf(bandId) >= DusunSesnsorEventHandler.tagRangeStart
-				&& Integer.valueOf(bandId) <= DusunSesnsorEventHandler.tagRangeEnd) {
-			bandDataJSON = jedis.get(DusunSesnsorEventHandler.tenant + ".tagId." + bandId);
-			erroBandKy = DusunSesnsorEventHandler.tenant + ".tagId." + bandId;
+		if (Integer.valueOf(bandId) >= FirehoseEventHandler.tagRangeStart
+				&& Integer.valueOf(bandId) <= FirehoseEventHandler.tagRangeEnd) {
+			bandDataJSON = jedis.get(FirehoseEventHandler.tenant + ".tagId." + bandId);
+			erroBandKy = FirehoseEventHandler.tenant + ".tagId." + bandId;
 		} else {
-			bandDataJSON = jedis.get(DusunSesnsorEventHandler.tenant + ".bandId." + bandId);
-			erroBandKy = DusunSesnsorEventHandler.tenant + ".bandId." + bandId;
+			bandDataJSON = jedis.get(FirehoseEventHandler.tenant + ".bandId." + bandId);
+			erroBandKy = FirehoseEventHandler.tenant + ".bandId." + bandId;
 		}
 
 		if (bandDataJSON == null) {
-			errorListRedis.add(DusunSesnsorEventHandler.tenant + ".bandId." + bandId);
+			errorListRedis.add(FirehoseEventHandler.tenant + ".bandId." + bandId);
 			return null;
 		}
 		mapDataFromRedis = objectMapper.readValue(bandDataJSON, mapDataFromRedis.getClass());
@@ -115,8 +115,9 @@ public class LambdaUtil {
 		bandEvent.setAmbTemp(convertAmbientTemp(rawDataString.substring(21, 24)));
 		bandEvent.setBattery(convertBatteryVal(rawDataString.substring(24, 25)));
 		bandEvent.setAccValueX(Integer.parseInt(rawDataString.substring(25, 26), 16));
-		 
-		bridgeEvent.setMacId(bleMacId);
+		bandEvent.setSessionId(Integer.parseInt(rawDataString.substring(26, 28), 16));
+
+		bridgeEvent.setMacId(bleMqacId);
 
 		bridgeEvent.setHeartBeatTime(Long.valueOf(map2.get("scan_time").toString() + "000"));
 

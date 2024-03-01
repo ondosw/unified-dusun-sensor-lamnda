@@ -1,4 +1,4 @@
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -33,38 +33,38 @@ public class LambdaLogic {
 		List<Map<String, Object>> filteredDataList = new ArrayList<>();
 		Map<String, List<Map<String, Object>>> bleMacIdsAndfilteredDataList = new HashMap<>();
 		Set<String> duplicateCheck = new HashSet<>();
+		System.out.println("TOTAL   Parsed Record=" + dataList.size());
+	 
 		for (Map<String, Object> map : dataList) {
-
+		 
 			Map<String, Object> data = (Map<String, Object>) map.get("data");
-			if (data.get("attribute") != null && data.get("mac") != null
-					&& data.get("attribute").toString().equalsIgnoreCase("gateway.heartbeat")) {
-				String macId = map.get("mac").toString().replace(":", "");
-				Map<String, Object> data_value = (Map<String, Object>) data.get("value");
-				bridgeMacIdsAndHeartBeatTime.put(macId,
-						Long.valueOf(data_value.get("current_time").toString() + "000"));
-				System.out.println("heartbeat DATA");
+			if (data.get("attribute") != null && "mod.ble.beacon".equalsIgnoreCase(data.get("attribute").toString())) {
+				
 
-			}
-
-			else {
-				Map<String, Object> data_value = (Map<String, Object>) data.get("value");
-
-				List<Map<String, Object>> device_list = (List<Map<String, Object>>) data_value.get("device_list");
-				for (Map<String, Object> map2 : device_list) {
-					if (map2.get("connectable") != null) {
-						if ("1".equalsIgnoreCase(map2.get("connectable").toString()) == false
-								&& !duplicateCheck.contains(map2.get("data").toString())) {
-							filteredDataList.add(map2);
-							System.out.println("SENSOR DATA");
-							duplicateCheck.add(map2.get("data").toString());
+				 try { 
+			 
+					 Map<String, Object> data_value = (Map<String, Object>) data.get("value");
+						if (data_value.get("data").toString().startsWith("0D")  ) {
+							 
+								filteredDataList.add(data_value);
+								duplicateCheck.add(data_value.get("data").toString());
+					 
 						}
-					}
+				 
+					bleMacIdsAndfilteredDataList.put(map.get("mac").toString().replace(":", "").toUpperCase(), filteredDataList);
+				 }
+				 catch (Exception e) {
+				 System.out.println("ERR  data_value is not Map"+" Data= "+data);
 				}
-				bleMacIdsAndfilteredDataList.put(map.get("ble_addr").toString().replace(":", ""), filteredDataList);
+				 
+			}
+			else {
+				System.out.println("ERR Attribute Condition failed "+data.get("attribute")+" Data= "+data);
 			}
 
 		}
-		System.out.println("TOTALconnectable RECORD=" + filteredDataList.size());
+		System.out.println("TOTAL VALID RECORD=" + filteredDataList.size());
+		System.out.println("TOTAL RECORD=" + filteredDataList.size());
 
 		List<BandEvent> allBandEvents = new ArrayList<>();
 		Set<String> bandIds = new HashSet<>();
@@ -127,8 +127,7 @@ public class LambdaLogic {
 		}
 		List<DBRecord> dbRecords = new ArrayList<DBRecord>();
 
-		// Stopwatch bandStopWatch = new Stopwatch();
-		// bandStopWatch.StartTiming();
+	 
 
 		try {
 			System.out.println("##############UNIFIED + Before PrepareDBRecord ");
@@ -197,12 +196,11 @@ public class LambdaLogic {
 				allRecid.add(dbRecord.getRecordId());
 				writeRequests.add(writeRequest);
 			}
-
-			// Do batching
+ 
 			BatchWriteItemRequest request = new BatchWriteItemRequest();
 			request.addRequestItemsEntry("ondoreport", writeRequests);
 
-			// System.out.println("#########JUST BEFORE INSERT " + writeRequests.size());
+			 
 
 			i--;
 			try {

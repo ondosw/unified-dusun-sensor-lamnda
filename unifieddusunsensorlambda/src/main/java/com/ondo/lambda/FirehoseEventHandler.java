@@ -38,7 +38,7 @@
 *
 *  ************************************************************************/
 
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -62,7 +62,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import redis.clients.jedis.Jedis;
 
-public class DusunSesnsorEventHandler
+public class FirehoseEventHandler
 		implements RequestHandler<KinesisFirehoseEvent, KinesisAnalyticsInputPreprocessingResponse> {
 
 

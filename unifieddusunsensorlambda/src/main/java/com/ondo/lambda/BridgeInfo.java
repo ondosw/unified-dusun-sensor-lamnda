@@ -39,16 +39,26 @@
  *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
  *
  *  ************************************************************************/
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
-public class BridgeEvent {
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-	private String rawData;
-	private String macId;
-	private long heartBeatTime;
-	private String recordId;
+public class BridgeInfo {
 
+	@JsonProperty("bridgeId")
 	private String bridgeId;
+
+	@JsonProperty("facilityId")
+	private String facilityId;
+
+	@JsonProperty("bleMacId")
+	private String bleMacId;
+
+	@JsonProperty("bridgeName")
+	private String bridgeName;
+
+	@JsonProperty("lastHeartBeatTime")
+	private Long lastHeartBeatTime;
 
 	public String getBridgeId() {
 		return bridgeId;
@@ -58,36 +68,44 @@ public class BridgeEvent {
 		this.bridgeId = bridgeId;
 	}
 
-	public String getRecordId() {
-		return recordId;
+	public String getFacilityId() {
+		return facilityId;
 	}
 
-	public void setRecordId(String recordId) {
-		this.recordId = recordId;
+	public void setFacilityId(String facilityId) {
+		this.facilityId = facilityId;
 	}
 
-	public String getRawData() {
-		return rawData;
+	public String getBleMacId() {
+		return bleMacId;
 	}
 
-	public void setRawData(String rawData) {
-		this.rawData = rawData;
+	public void setBleMacId(String bleMacId) {
+		this.bleMacId = bleMacId;
 	}
 
-	public String getMacId() {
-		return macId;
+	public String getBridgeName() {
+		return bridgeName;
 	}
 
-	public void setMacId(String macId) {
-		this.macId = macId;
+	public void setBridgeName(String bridgeName) {
+		this.bridgeName = bridgeName;
 	}
 
-	public long getHeartBeatTime() {
-		return heartBeatTime;
+	public Long getLastHeartBeatTime() {
+		return lastHeartBeatTime;
 	}
 
-	public void setHeartBeatTime(long heartBeatTime) {
-		this.heartBeatTime = heartBeatTime;
+	public void setLastHeartBeatTime(Long lastHeartBeatTime) {
+		this.lastHeartBeatTime = lastHeartBeatTime;
 	}
+
+	@Override
+	public String toString() {
+		return "BridgeInfo [bridgeId=" + bridgeId + ", facilityId=" + facilityId + ", bleMacId=" + bleMacId
+				+ ", bridgeName=" + bridgeName + ", lastHeartBeatTime=" + lastHeartBeatTime + "]";
+	}
+	
+	
 
 }

@@ -39,19 +39,16 @@
  *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
  *
  *  ************************************************************************/
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
-public class BridgeRedisDTO {
+public class BridgeEvent {
+
+	private String rawData;
+	private String macId;
+	private long heartBeatTime;
+	private String recordId;
 
 	private String bridgeId;
-
-	private String facilityId;
-
-	private String bleMacId;
-
-	private String bridgeName;
-
-	private Long lastHeartBeatTime;
 
 	public String getBridgeId() {
 		return bridgeId;
@@ -61,36 +58,36 @@ public class BridgeRedisDTO {
 		this.bridgeId = bridgeId;
 	}
 
-	public String getFacilityId() {
-		return facilityId;
+	public String getRecordId() {
+		return recordId;
 	}
 
-	public void setFacilityId(String facilityId) {
-		this.facilityId = facilityId;
+	public void setRecordId(String recordId) {
+		this.recordId = recordId;
 	}
 
-	public String getBleMacId() {
-		return bleMacId;
+	public String getRawData() {
+		return rawData;
 	}
 
-	public void setBleMacId(String bleMacId) {
-		this.bleMacId = bleMacId;
+	public void setRawData(String rawData) {
+		this.rawData = rawData;
 	}
 
-	public String getBridgeName() {
-		return bridgeName;
+	public String getMacId() {
+		return macId;
 	}
 
-	public void setBridgeName(String bridgeName) {
-		this.bridgeName = bridgeName;
+	public void setMacId(String macId) {
+		this.macId = macId;
 	}
 
-	public Long getLastHeartBeatTime() {
-		return lastHeartBeatTime;
+	public long getHeartBeatTime() {
+		return heartBeatTime;
 	}
 
-	public void setLastHeartBeatTime(Long lastHeartBeatTime) {
-		this.lastHeartBeatTime = lastHeartBeatTime;
+	public void setHeartBeatTime(long heartBeatTime) {
+		this.heartBeatTime = heartBeatTime;
 	}
 
 }

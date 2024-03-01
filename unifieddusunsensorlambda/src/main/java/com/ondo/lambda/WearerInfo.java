@@ -39,7 +39,7 @@
  *  INCONSISTENT WITH THE DESIGNED PURPOSE OF THE ONDO System PRODUCT.
  *
  *  ************************************************************************/
-package com.ondo.unifieddusunsensorlambda;
+package com.ondo.lambda;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
  
